@@ -1,5 +1,4 @@
-# wifi_live_dashboard_wdutil
-# macOS live Wi-Fi chart using `sudo wdutil info` instead of airport
+
 
 import subprocess, sys, time, datetime, math, platform, threading, re
 from collections import deque, defaultdict

@@ -1,7 +1,7 @@
 [project]
 name = "wi-sense"
 version = "0.1.0"
-description = "Add your description here"
+description = "Python application to test Wifi-Signal Strength"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

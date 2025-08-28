@@ -1,14 +1,15 @@
-
-
-import subprocess, sys, time, datetime, math, platform, threading, re
+# purpose of the depecdancies, line 2, system level data, and system level file access
+import subprocess, time, datetime, threading, re
+# import deque and default dictionary from collections
 from collections import deque, defaultdict
+# powerfull data retreiving module
 import pandas as pd
+# module for plotting points
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 
-SAMPLE_INTERVAL_SEC = 0.5
-ROLLING_WINDOW_SEC = 300
-DISPLAY_WINDOW_SEC = 60  # Show only last 60 seconds by default
+
+SAMPLE_INTERVAL_SEC = 0.5; ROLLING_WINDOW_SEC = 300; DISPLAY_WINDOW_SEC = 60 
+
 MATERIAL_KEYS = {
     '1': 'baseline',
     '2': 'wood',
@@ -19,60 +20,33 @@ MATERIAL_KEYS = {
     '7': 'steel',
 }
 
-# Background colors for each material
 MATERIAL_COLORS = {
-    'baseline': '#f8f9fa',    # Light gray
-    'wood': '#f4e4bc',        # Light brown
-    'plastic': '#e3f2fd',     # Light blue
-    'glass': '#f1f8e9',       # Light green
-    'aluminium': '#eceff1',   # Light blue-gray
-    'copper': '#fff3e0',      # Light orange
-    'steel': '#fafafa',       # Very light gray
+    'baseline': '#f8f9fa', 
+    'wood': '#f4e4bc',      
+    'plastic': '#e3f2fd',    
+    'glass': '#f1f8e9',       
+    'aluminium': '#eceff1',  
+    'copper': '#fff3e0',     
+    'steel': '#fafafa',   
 }
+# constant format of creating the csv's
 CSV_FILENAME = f"wifi_readings_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
 def parse_wdutil_output(txt: str):
-    """
-    Parse `sudo wdutil info` output for RSSI and noise.
-    Looks for lines like:
-      RSSI                 : -40 dBm
-      Noise                : -90 dBm
-    Only looks in the WIFI section, not BLUETOOTH section.
-    """
     rssi, noise = None, None
-    in_wifi_section = False
     
     for line in txt.splitlines():
-        line = line.strip()
-        
-        # Check if we're entering the WIFI section
-        if line == "WIFI":
-            in_wifi_section = True
-            continue
-        
-        # Check if we're leaving the WIFI section (entering another section)
-        if line.startswith("————") and in_wifi_section:
-            # Look ahead to see if next section is starting
-            continue
-        elif in_wifi_section and len(line) > 0 and not line.startswith("————") and line.isupper() and not ":" in line:
-            # This is likely a new section header (like BLUETOOTH)
-            in_wifi_section = False
-            continue
-            
-        # Only parse RSSI/Noise if we're in the WIFI section
-        if in_wifi_section:
-            if "RSSI" in line and ":" in line:
-                try:
-                    # Extract the value between : and dBm
-                    value_part = line.split(":")[1].strip()
-                    rssi = float(re.findall(r"[-]?\d+", value_part)[0])
-                except: pass
-            elif "Noise" in line and ":" in line:
-                try:
-                    # Extract the value between : and dBm
-                    value_part = line.split(":")[1].strip()
-                    noise = float(re.findall(r"[-]?\d+", value_part)[0])
-                except: pass
+        if line.count(':') == 1:
+            iline=line.split(':')
+            key = iline[0].strip(' '); value = iline[1].strip(' ')
+            if key == 'RSSI':
+                rssi = float(value.replace(' dBm', ''))
+            elif key == 'Noise':
+                noise = float(value.replace(' dBm', ''))
+            else:
+                continue 
+        else:
+            continue 
                 
     if rssi is None or noise is None:
         raise ValueError("Could not parse RSSI/Noise from wdutil output.")
@@ -84,12 +58,12 @@ def read_wifi_metrics_macos():
     """
     cmd = ["sudo", "wdutil", "info"]
     out = subprocess.check_output(cmd, text=True)
-    return parse_wdutil_output(out)
+    return parse_wdutil_output(txt=out)
 
-# ---------------- same LiveData class as before ----------------
 class LiveData:
     def __init__(self, window_sec=ROLLING_WINDOW_SEC):
         self.window_sec = window_sec
+        # deque means double ended que allowing for fast appending
         self.times, self.rssi, self.noise, self.snr = deque(), deque(), deque(), deque()
         self.snr_by_material = defaultdict(list)
         self.material_events = []
@@ -99,7 +73,7 @@ class LiveData:
         self._csv_lock = threading.Lock()
         # Track material changes for background coloring
         self.material_transitions = []  # [(time, material), ...]
-
+# reached line 74
     def append(self, ts, rssi, noise):
         snr = rssi - noise
         self.times.append(ts); self.rssi.append(rssi); self.noise.append(noise); self.snr.append(snr)
@@ -134,7 +108,7 @@ class LiveData:
         self.material_events.clear()
         self.material_transitions.clear()
         self.current_material = "baseline"
-        # Keep CSV data but add a separator comment
+
         with self._csv_lock:
             self.csv_rows.append({
                 "timestamp": datetime.datetime.now().isoformat(),
@@ -150,12 +124,12 @@ class LiveData:
             if self.csv_rows:
                 pd.DataFrame(self.csv_rows).to_csv(filename, index=False)
 
-# ---------------- Plotting ----------------
+
 def main():
     data = LiveData()
     start = time.time()
     
-    # Create figure with enhanced navigation
+
     fig, ax = plt.subplots(figsize=(12,7))
     fig.canvas.manager.set_window_title('Wi-Sense - WiFi Signal Monitor')
     
@@ -163,7 +137,6 @@ def main():
     ax.set_ylabel("dBm (RSSI/Noise), dB (SNR)")
     ax.set_title("Live Wi-Fi Signal (from wdutil)")
     ax.grid(True, alpha=0.3)
-    # Set initial background color for baseline
     ax.set_facecolor(MATERIAL_COLORS.get('baseline', '#ffffff'))
 
     (line_rssi,) = ax.plot([], [], label="RSSI")
@@ -172,11 +145,10 @@ def main():
     ax.legend(loc="upper right")
     stats_box = ax.text(0.02,0.98,"", transform=ax.transAxes, va="top",ha="left",
                         bbox=dict(boxstyle="round", alpha=0.1))
-    
-    # Track view mode and scrolling
+
     is_stats_view = False
-    auto_scroll = True  # Auto-scroll to follow live data
-    display_window = DISPLAY_WINDOW_SEC  # Current display window size
+    auto_scroll = True 
+    display_window = DISPLAY_WINDOW_SEC  
 
     def update_x_axis():
         """Update x-axis limits based on current mode"""
@@ -575,7 +547,6 @@ def main():
     fig.canvas.mpl_connect('key_press_event', on_key)
 
     def update(_frame):
-        # Only update if we're in live view mode
         if is_stats_view:
             return
             

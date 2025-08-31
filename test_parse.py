@@ -43,6 +43,8 @@ def parse_wdutil_output(txt):
     return rssi, noise
 
 if __name__ == "__main__":
+    # code called when the program starts.
+    # command to fetch wdutil
     cmd = ['sudo', 'wdutil', 'info']
     out = subprocess.check_output(cmd, text=True)
     rssi, noise = parse_wdutil_output(out)

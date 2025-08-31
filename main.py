@@ -8,7 +8,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-SAMPLE_INTERVAL_SEC = 0.5; ROLLING_WINDOW_SEC = 300; DISPLAY_WINDOW_SEC = 60 
+SAMPLE_INTERVAL_SEC = 0.5; 
+ROLLING_WINDOW_SEC = 300; 
+DISPLAY_WINDOW_SEC = 60 
 
 MATERIAL_KEYS = {
     '1': 'baseline',
@@ -17,7 +19,7 @@ MATERIAL_KEYS = {
     '4': 'glass',
     '5': 'aluminium',
     '6': 'copper',
-    '7': 'steel',
+    '7': 'brass',
 }
 
 MATERIAL_COLORS = {
@@ -27,7 +29,7 @@ MATERIAL_COLORS = {
     'glass': '#f1f8e9',       
     'aluminium': '#eceff1',  
     'copper': '#fff3e0',     
-    'steel': '#fafafa',   
+    'brass': '#fafafa',   
 }
 # constant format of creating the csv's
 CSV_FILENAME = f"wifi_readings_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -61,6 +63,44 @@ def read_wifi_metrics_macos():
     return parse_wdutil_output(txt=out)
 
 class LiveData:
+    """
+    LiveData manages real-time signal data (RSSI, noise, SNR) in a rolling window, 
+    tracks material transitions, and supports CSV export for analysis.
+
+    Attributes:
+        window_sec (int): Rolling window size in seconds for retaining data.
+        times (deque): Timestamps of collected data points.
+        rssi (deque): Received Signal Strength Indicator values.
+        noise (deque): Noise level values.
+        snr (deque): Signal-to-Noise Ratio values.
+        snr_by_material (defaultdict): Maps material names to lists of SNR values.
+        material_events (list): List of material change events.
+        current_material (str): Name of the currently active material.
+        current_band (str): Frequency band currently in use.
+        csv_rows (list): List of dictionaries representing rows for CSV export.
+        _csv_lock (threading.Lock): Lock for thread-safe CSV row access.
+        material_transitions (list): List of tuples (timestamp, material) for transition tracking.
+
+    Methods:
+        __init__(window_sec=ROLLING_WINDOW_SEC):
+            Initializes the LiveData instance with a rolling window and empty data structures.
+
+        append(ts, rssi, noise):
+            Adds a new data point (timestamp, RSSI, noise) to the rolling window.
+            Calculates SNR and updates all relevant data structures.
+            Removes data points outside the rolling window.
+            Cleans up old material transitions.
+            Appends the new data to the CSV row buffer (thread-safe).
+
+        set_material(material, timestamp):
+            Sets the current material and records the transition time for background coloring and analysis.
+
+        clear_data():
+            Clears all collected data, resets to baseline material, and logs a "CLEARED" event in the CSV buffer.
+
+        export_csv(filename):
+            Exports all collected CSV rows to a file using pandas, ensuring thread safety.
+    """
     def __init__(self, window_sec=ROLLING_WINDOW_SEC):
         self.window_sec = window_sec
         # deque means double ended que allowing for fast appending
@@ -74,7 +114,28 @@ class LiveData:
         # Track material changes for background coloring
         self.material_transitions = []  # [(time, material), ...]
 # reached line 74
+
     def append(self, ts, rssi, noise):
+        """
+        Appends a new measurement to the internal data structures, maintaining a sliding time window.
+
+        Parameters:
+            ts (float): The timestamp of the measurement in seconds since the epoch.
+            rssi (float): The received signal strength indicator (RSSI) value in dBm.
+            noise (float): The noise level in dBm.
+
+        Process:
+            - Calculates the signal-to-noise ratio (SNR) as the difference between RSSI and noise.
+            - Appends the timestamp, RSSI, noise, and SNR values to their respective deques.
+            - Removes entries from the deques that are older than the configured time window (`self.window_sec`).
+            - Cleans up old material transitions, retaining only those within the time window.
+            - Appends the SNR value to the SNR history for the current material.
+            - Adds a new row to the CSV buffer with the measurement details, including timestamp (ISO format), band, material, RSSI, noise, and SNR.
+            - Ensures thread safety when modifying the CSV buffer using a lock.
+
+        Note:
+            This method is intended to be called whenever a new measurement is received, ensuring that only recent data is retained and properly logged.
+        """
         snr = rssi - noise
         self.times.append(ts); self.rssi.append(rssi); self.noise.append(noise); self.snr.append(snr)
         cutoff = ts - self.window_sec

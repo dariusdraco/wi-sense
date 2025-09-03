@@ -23,7 +23,7 @@ A macOS application for real-time WiFi signal monitoring and analysis using `wdu
   - Glass
   - Aluminum
   - Copper
-  - Steel
+  - Brass
 - **Interactive Marking**: Use keyboard shortcuts (1-7) to mark current material during testing
 - **Visual Indicators**: Vertical lines on charts mark material transition points
 - **Background Color Coding**: Each material gets a distinct background color for easy visual identification
@@ -82,7 +82,7 @@ The program will:
 
 #### Material and Data Controls
 
-- **1-7**: Select material type (baseline, wood, plastic, glass, aluminum, copper, steel)
+- **1-7**: Select material type (baseline, wood, plastic, glass, aluminum, copper, brass)
 - **b**: Toggle between 2.4GHz and 5GHz band labels
 - **s**: Switch to statistics view (histogram of median values per material)
 - **c**: Clear graph and reset to baseline (in live view) / Return to live view (from statistics)
@@ -134,7 +134,7 @@ The program will:
 - **Glass**: Light green background
 - **Aluminum**: Light blue-gray background
 - **Copper**: Light orange background
-- **Steel**: Very light gray background
+- **brass**: Very light gray background
 
 #### Interpreting Values
 
